@@ -1,20 +1,16 @@
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileReader;
-import java.io.IOException;
-import java.io.PrintWriter;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.StringTokenizer;
+import java.io.*;
+import java.util.*;
 
 public class Reader {
 	StringTokenizer st;
 	PrintWriter out;
 	BufferedReader br;
 
-	// BufferedReader tmp;
+	private final boolean useTimeoutChecker;
+
+	public Reader(boolean useTimeoutChecker) {
+		this.useTimeoutChecker = useTimeoutChecker;
+	}
 
 	private String nextToken() throws IOException {
 		while (st == null || !st.hasMoreTokens()) {
@@ -35,60 +31,61 @@ public class Reader {
 		return Double.parseDouble(nextToken());
 	}
 
-	// public static void main(String[] args) throws FileNotFoundException {
-	// new Reader().run();
-
-	// }
-
-	void run(Map<Integer, String> adds, ArrayList<String> counters,
-			String InpFile) throws IOException {
-		br = new BufferedReader(new FileReader(InpFile));
-		out = new PrintWriter("Temp/" + InpFile);
+	public void run(Map<Integer, String> adds, Map<Integer, String> change,
+			List<String> counters, BufferedReader br, PrintWriter out,
+			String originalName, String newName) throws IOException {
 		int numberOfString = 0;
-		out.println("import java.util.HashMap;");
-		out.println("import java.util.Map;");
 		boolean init = false;
-		while (true) {
+		String line;
+		while ((line = br.readLine()) != null) {
+			line = line.replace(originalName, newName);
 			numberOfString++;
-			String tmp = br.readLine();
-			if (tmp == null) {
-				out.close();
-				return;
-
+			if (line.contains(" class ") & !init && useTimeoutChecker) {
+				out.println("import ru.ifmo.ctd.ngp.demo.testgen.TimeoutChecker;");
 			}
-
 			if (adds.get(numberOfString) != null) {
 				out.println(adds.get(numberOfString));
-				if (adds.get(numberOfString).equals("} finally {")) {
-					//out.println(" try{ \n PrintWriter result_out$ = new PrintWriter(\"result.txt\");");
-					//for (String s : counters) {
-						//out.println("result_out$.println(\"" + s + ":\" + " + s
-						//		+ ");");
-					//}
-					//out.println("result_out$.close(); \n } catch (FileNotFoundException e) { \n e.printStackTrace(); \n }");
-					out.println("}");
-				}
-				out.println(tmp);
-				adds.remove(numberOfString);
+				if (change.get(numberOfString) != null)
+					out.print(line.substring(0, line.length() - 1));
+				else
+					out.println(line);
 			} else {
-				out.println(tmp);
+				if (change.get(numberOfString) != null)
+					out.print(line.substring(0, line.length() - 1));
+				else
+					out.println(line);
 			}
-			if (tmp.contains(" class ") & !init) {
-				out.println("static Map<String, Long> variables = new HashMap<String, Long>();");
-				out.println("static void Reload() {");
-				//out.println("Map<String, Integer> variables = new HashMap<String, Integer>();");
+			if (line.contains(" class ") & !init) {
 				for (String s : counters) {
-					out.println("variables.put(\"" + s + "\", (long) 0);");
+					out.println("    private static long " + s + " = 0;");
+					if (s.startsWith("mem")) {
+						out.println("    private static long tempCounter"
+								+ s.split("\\$")[1] + " = 0;");
+					}
 				}
-				out.println("}");
-				out.println("static void PrintVariables() throws FileNotFoundException {");
-				out.println("PrintWriter result_out$ = new PrintWriter(\"result.txt\");");
-				out.println("for (String s : variables.keySet())\n result_out$.println(s + \" : \" + variables.get(s));");
-				out.println("result_out$.close(); \n ");
-				out.println("\n}");
+				out.println("    public static void profilerCleanup() {");
+				for (String s : counters) {
+					out.println("        " + s + " = 0;");
+				}
+				out.println("    }");
+				out.println("    public static java.util.Map<String, Long> profilerTimeData() {");
+				out.println("        java.util.Map<String, Long> rv = new java.util.HashMap<>();");
+				for (String s : counters) {
+					if (!s.startsWith("mem"))
+						out.println("        rv.put(\"" + s + "\", " + s + ");");
+				}
+				out.println("        return rv;");
+				out.println("    }");
+				out.println("    public static java.util.Map<String, Long> profilerMemData() {");
+				out.println("        java.util.Map<String, Long> rv = new java.util.HashMap<>();");
+				for (String s : counters) {
+					if (s.startsWith("mem"))
+						out.println("        rv.put(\"" + s + "\", " + s + ");");
+				}
+				out.println("        return rv;");
+				out.println("    }");
 				init = true;
 			}
 		}
-
 	}
 }
